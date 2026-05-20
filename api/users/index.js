@@ -16,9 +16,9 @@ const withCompanyId = (handler) => {
             // Verify company exists in database
             const company = await Company.findById(companyId);
             if (!company) {
-                return res.status(403).json({ 
+                return res.status(403).json({
                     error: 'Company not found or invalid companyId',
-                    companyId 
+                    companyId
                 });
             }
             req.companyId = companyId;
@@ -27,7 +27,7 @@ const withCompanyId = (handler) => {
             console.error('Company verification error:', error);
             return res.status(500).json({ error: 'Failed to verify company' });
         }
-        
+
         return handler(req, res);
     };
 };
@@ -70,12 +70,12 @@ const handler = async (req, res) => {
         });
     } catch (error) {
         console.error('Create user error:', error);
-        
+
         // Handle duplicate email for company
         if (error.code === 11000) {
             return res.status(409).json({ error: 'Email already exists for this company' });
         }
-        
+
         res.status(500).json({ error: 'Failed to create user' });
     }
 };

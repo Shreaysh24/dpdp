@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
         const { companyId } = req.query;
 
         if (!companyId) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'Missing companyId parameter',
                 example: '/api/verify-company?companyId=6a0d5d1f86d3f6c11f287c86'
             });
