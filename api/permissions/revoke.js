@@ -1,7 +1,8 @@
 const Permission = require('../../models/Permission');
+const Company = require('../../models/Company');
 const { connectDB } = require('../../lib/mongodb');
 
-// Middleware wrapper for Vercel
+// Middleware wrapper for Vercel - with company verification
 const withCompanyId = (handler) => {
     return async (req, res) => {
         // Extract companyId from headers
@@ -9,7 +10,23 @@ const withCompanyId = (handler) => {
         if (!companyId) {
             return res.status(400).json({ error: 'Missing companyId - x-company-id header required' });
         }
-        req.companyId = companyId;
+
+        try {
+            // Verify company exists in database
+            const company = await Company.findById(companyId);
+            if (!company) {
+                return res.status(403).json({ 
+                    error: 'Company not found or invalid companyId',
+                    companyId 
+                });
+            }
+            req.companyId = companyId;
+            req.company = company;
+        } catch (error) {
+            console.error('Company verification error:', error);
+            return res.status(500).json({ error: 'Failed to verify company' });
+        }
+        
         return handler(req, res);
     };
 };

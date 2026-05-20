@@ -106,7 +106,46 @@ curl -X POST https://dpdp-ten.vercel.app/api/users \
 
 ---
 
-## 🚀 API Endpoints
+## � Verify Company Exists
+
+**GET** `/api/verify-company`
+
+Use this endpoint to verify a company exists in the database before using it.
+
+**Query Parameters:**
+```
+GET /api/verify-company?companyId=6a0d5d1f86d3f6c11f287c86
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "exists": true,
+  "company": {
+    "companyId": "6a0d5d1f86d3f6c11f287c86",
+    "name": "POLO",
+    "email": "polo@gmail.com",
+    "domain": "polo@gmail.com",
+    "apiKey": "dpdp_88b3b70c3c7df9b92cf898ecad1d534425ee1cdc9e2597e0470cd06702d5a829",
+    "createdAt": "2026-05-20T07:05:03.067+00:00",
+    "updatedAt": "2026-05-20T07:05:03.067+00:00"
+  }
+}
+```
+
+**Response (Not Found):**
+```json
+{
+  "error": "Company not found",
+  "companyId": "6a0d5d1f86d3f6c11f287c86",
+  "exists": false
+}
+```
+
+---
+
+## �🚀 API Endpoints
 
 ### Create User
 
@@ -387,6 +426,33 @@ Content-Type: application/json
 
 ## 🔐 Security Features
 
+### ✅ Company Existence Verification
+
+**NEW:** Every API request now verifies that the company exists in the database before processing.
+
+**Flow:**
+```
+1. Client sends request with x-company-id header
+2. Backend extracts companyId
+3. Backend queries Company collection
+4. If NOT found → 403 Forbidden
+5. If found → proceed with operation
+```
+
+**Response when company not found:**
+```json
+{
+  "error": "Company not found or invalid companyId",
+  "companyId": "invalid-id-123"
+}
+Status: 403 Forbidden
+```
+
+This prevents:
+- ❌ Invalid companyId usage
+- ❌ Accidental data operations with wrong company ID
+- ❌ Unauthorized company access
+
 ### ✅ Multi-Tenant Isolation
 
 **Company A:**
@@ -610,9 +676,37 @@ All error responses include:
 
 | Issue | Solution |
 |-------|----------|
+| 403 Company not found | Verify companyId exists: `/api/verify-company?companyId=6a0d...` |
 | Missing x-company-id header | Add header to all requests |
-| 404 on valid user/data | Check companyId matches |
+| 404 on valid user/data | Check companyId matches the resource owner |
 | Duplicate email error | Email exists for this company |
 | User not found in company | User belongs to different company |
 | Failed to create data | Verify user exists in company |
+| Invalid companyId format | Must be valid MongoDB ObjectId |
+
+---
+
+## 🔧 Verify Your Company
+
+Before using any API endpoint, verify your company exists:
+
+**Example:**
+```bash
+curl -X GET "https://dpdp-ten.vercel.app/api/verify-company?companyId=6a0d5d1f86d3f6c11f287c86"
+
+# Response:
+{
+  "success": true,
+  "exists": true,
+  "company": {
+    "companyId": "6a0d5d1f86d3f6c11f287c86",
+    "name": "POLO",
+    "email": "polo@gmail.com"
+  }
+}
+```
+
+✅ If you get this response, your companyId is valid and ready to use!
+
+---
 
