@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const Permission = require('../../models/Permission');
+const { connectDB } = require('../../lib/mongodb');
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
@@ -7,6 +8,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        await connectDB();
         const { userUID, data } = req.body;
 
         if (!userUID || !data || !data.subject) {

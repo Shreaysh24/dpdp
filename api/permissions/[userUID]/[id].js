@@ -1,4 +1,5 @@
 const Permission = require('../../../models/Permission');
+const { connectDB } = require('../../../lib/mongodb');
 
 module.exports = async (req, res) => {
     if (req.method !== 'GET') {
@@ -6,6 +7,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        await connectDB();
         const { userUID, id } = req.query;
 
         if (!userUID || !id) {

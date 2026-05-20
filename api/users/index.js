@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const User = require('../../models/User');
+const { connectDB } = require('../../lib/mongodb');
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
@@ -7,6 +8,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        await connectDB();
         const userUID = uuidv4();
         const user = new User({ userUID, createdAt: new Date() });
         await user.save();

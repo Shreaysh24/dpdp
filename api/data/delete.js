@@ -1,4 +1,5 @@
 const Data = require('../../models/Data');
+const { connectDB } = require('../../lib/mongodb');
 
 module.exports = async (req, res) => {
     if (req.method !== 'DELETE') {
@@ -6,6 +7,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        await connectDB();
         const { userUID, dataId } = req.body;
 
         if (!userUID || !dataId) {
