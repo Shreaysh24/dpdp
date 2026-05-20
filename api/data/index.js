@@ -15,7 +15,9 @@ const withCompanyId = (handler) => {
 
         try {
             // Verify company exists in database
-            const company = await Company.findById(companyId);
+            const company = await Company.findOne({
+   apiKey: companyId
+})
             if (!company) {
                 return res.status(403).json({
                     error: 'Company not found or invalid companyId',
