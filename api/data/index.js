@@ -26,9 +26,9 @@ const handler = async (req, res) => {
         }
 
         // Verify user belongs to company (security check)
-        const user = await User.findOne({ 
-            companyId, 
-            userUID 
+        const user = await User.findOne({
+            companyId,
+            userUID
         });
 
         if (!user) {
