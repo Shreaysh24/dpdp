@@ -121,7 +121,63 @@ curl -X POST http://localhost:3000/dpdp/users \
 
 ---
 
-### 2️⃣ STORE DATA
+### 2️⃣ LIST ALL DATA (GET ALL DATA FOR USER)
+**Endpoint:** `GET /dpdp/data/:userUID`
+
+**Purpose:** Get all data records for a specific user
+
+**URL Parameters:**
+- `userUID`: User's unique ID
+
+**Expected Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "data-record-id-1",
+      "userUID": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "email",
+      "value": "user@personal.com",
+      "revoked": false,
+      "createdAt": "2026-05-20T10:30:00.000Z",
+      "updatedAt": "2026-05-20T10:30:00.000Z"
+    },
+    {
+      "_id": "data-record-id-2",
+      "userUID": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "phone",
+      "value": "+1234567890",
+      "revoked": false,
+      "createdAt": "2026-05-20T10:31:00.000Z",
+      "updatedAt": "2026-05-20T10:31:00.000Z"
+    }
+  ],
+  "count": 2
+}
+```
+
+**cURL:**
+```bash
+curl -X GET "http://localhost:3000/dpdp/data/550e8400-e29b-41d4-a716-446655440000" \
+  -H "x-api-key: test-api-key-123"
+```
+
+**Postman:**
+- Method: GET
+- URL: `http://localhost:3000/dpdp/data/{{userUID}}`
+- Headers: `x-api-key: test-api-key-123`
+
+**Test Cases:**
+| Test Case | Input | Expected | Status |
+|-----------|-------|----------|--------|
+| Valid userUID | Existing user | Returns array of data | 200 |
+| User with no data | Valid userUID, no records | Returns empty array | 200 |
+| Invalid userUID | Wrong userUID | Returns empty array | 200 |
+
+---
+
+### 3️⃣ STORE DATA
 **Endpoint:** `POST /dpdp/data`
 
 **Purpose:** Store data record for a user
@@ -170,47 +226,6 @@ curl -X POST http://localhost:3000/dpdp/data \
 | User not found | Wrong userUID | Error: User not found | 404 |
 
 **Save dataId for next tests:** (from response)
-
----
-
-### 3️⃣ VIEW DATA
-**Endpoint:** `GET /dpdp/data/:userUID/:id`
-
-**Purpose:** View a specific data record
-
-**URL Parameters:**
-- `userUID`: User's unique ID
-- `id`: Data record ID
-
-**Expected Response (200):**
-```json
-{
-  "success": true,
-  "data": {
-    "_id": "data-record-id",
-    "companyId": "company-object-id",
-    "userUID": "550e8400-e29b-41d4-a716-446655440000",
-    "type": "email",
-    "value": "user@personal.com",
-    "revoked": false,
-    "createdAt": "2026-05-20T10:30:00.000Z",
-    "updatedAt": "2026-05-20T10:30:00.000Z"
-  }
-}
-```
-
-**cURL:**
-```bash
-curl -X GET "http://localhost:3000/dpdp/data/550e8400-e29b-41d4-a716-446655440000/data-record-id" \
-  -H "x-api-key: test-api-key-123"
-```
-
-**Test Cases:**
-| Test Case | Input | Expected | Status |
-|-----------|-------|----------|--------|
-| Valid ID | Correct userUID & dataId | Returns data record | 200 |
-| Invalid ID | Wrong dataId | Error: Not found | 404 |
-| Invalid userUID | Wrong userUID | Error: Not found | 404 |
 
 ---
 
@@ -352,48 +367,7 @@ curl -X POST http://localhost:3000/dpdp/permissions \
 
 ---
 
-### 7️⃣ VIEW PERMISSION
-**Endpoint:** `GET /dpdp/permissions/:userUID/:id`
-
-**Purpose:** View a specific permission record
-
-**URL Parameters:**
-- `userUID`: User's unique ID
-- `id`: Permission record ID
-
-**Expected Response (200):**
-```json
-{
-  "success": true,
-  "data": {
-    "_id": "permission-id",
-    "companyId": "company-object-id",
-    "permissionId": "uuid",
-    "userUID": "550e8400-e29b-41d4-a716-446655440000",
-    "subject": "view_documents",
-    "description": "User can view all company documents",
-    "revoked": false,
-    "createdAt": "2026-05-20T10:30:00.000Z",
-    "updatedAt": "2026-05-20T10:30:00.000Z"
-  }
-}
-```
-
-**cURL:**
-```bash
-curl -X GET "http://localhost:3000/dpdp/permissions/550e8400-e29b-41d4-a716-446655440000/permission-id" \
-  -H "x-api-key: test-api-key-123"
-```
-
-**Test Cases:**
-| Test Case | Input | Expected | Status |
-|-----------|-------|----------|--------|
-| Valid ID | Correct IDs | Returns permission | 200 |
-| Invalid ID | Wrong permissionId | Error: Not found | 404 |
-
----
-
-### 8️⃣ DELETE PERMISSION (Hard Delete)
+### 7️⃣ DELETE PERMISSION (Hard Delete)
 **Endpoint:** `POST /dpdp/permissions/delete`
 
 **Purpose:** Permanently delete a permission record
@@ -433,7 +407,7 @@ curl -X POST http://localhost:3000/dpdp/permissions/delete \
 
 ---
 
-### 9️⃣ REVOKE PERMISSION (Soft Delete)
+### 8️⃣ REVOKE PERMISSION (Soft Delete)
 **Endpoint:** `POST /dpdp/permissions/revoke`
 
 **Purpose:** Mark permission as revoked (soft delete)
@@ -501,12 +475,12 @@ curl -X POST http://localhost:3000/dpdp/data \
 ```
 **Save:** `dataId`
 
-### Step 3: View Data
+### Step 3: List All Data
 ```bash
-curl -X GET "http://localhost:3000/dpdp/data/USER_UID_FROM_STEP1/DATA_ID_FROM_STEP2" \
+curl -X GET "http://localhost:3000/dpdp/data/USER_UID_FROM_STEP1" \
   -H "x-api-key: test-api-key-123"
 ```
-**Expected:** Data record with all fields
+**Expected:** Array with data records
 
 ### Step 4: Create Permission
 ```bash
@@ -523,11 +497,12 @@ curl -X POST http://localhost:3000/dpdp/permissions \
 ```
 **Save:** `permissionId`
 
-### Step 5: View Permission
+### Step 5: List All Permissions
 ```bash
-curl -X GET "http://localhost:3000/dpdp/permissions/USER_UID_FROM_STEP1/PERMISSION_ID_FROM_STEP4" \
+curl -X GET "http://localhost:3000/dpdp/permissions/USER_UID_FROM_STEP1" \
   -H "x-api-key: test-api-key-123"
 ```
+**Expected:** Array with permission records
 
 ### Step 6: Revoke Data
 ```bash
@@ -540,12 +515,12 @@ curl -X POST http://localhost:3000/dpdp/data/revoke \
   }'
 ```
 
-### Step 7: Verify Revoked (View Data again)
+### Step 7: Verify Revoked (List Data again to verify)
 ```bash
-curl -X GET "http://localhost:3000/dpdp/data/USER_UID_FROM_STEP1/DATA_ID_FROM_STEP2" \
+curl -X GET "http://localhost:3000/dpdp/data/USER_UID_FROM_STEP1" \
   -H "x-api-key: test-api-key-123"
 ```
-**Expected:** `"revoked": true`
+**Expected:** Data records array with `"revoked": true` for the revoked record
 
 ### Step 8: Revoke Permission
 ```bash
@@ -624,12 +599,12 @@ After deploying to Vercel:
 
 - [ ] Update all `http://localhost:3000` to `https://your-vercel-domain.com` in tests
 - [ ] Test create user endpoint
+- [ ] Test list all data endpoint
 - [ ] Test store data endpoint
-- [ ] Test view data endpoint
 - [ ] Test revoke data endpoint
 - [ ] Test delete data endpoint
+- [ ] Test list all permissions endpoint
 - [ ] Test create permission endpoint
-- [ ] Test view permission endpoint
 - [ ] Test revoke permission endpoint
 - [ ] Test delete permission endpoint
 - [ ] Test multi-tenant isolation (two companies)

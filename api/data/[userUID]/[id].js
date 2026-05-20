@@ -41,5 +41,3 @@ const handler = async (req, res) => {
 };
 
 module.exports = withCompanyVerification(handler);
-
-module.exports = withCompanyId(handler);

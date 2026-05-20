@@ -68,24 +68,3 @@ const handler = async (req, res) => {
 };
 
 module.exports = withCompanyVerification(handler);
-
-await permission.save();
-
-res.status(201).json({
-    success: true,
-    permissionId,
-    companyId,
-    userUID,
-});
-    } catch (error) {
-    console.error('Store permission error:', error);
-
-    if (error.code === 11000) {
-        return res.status(409).json({ error: 'Permission record already exists for this company' });
-    }
-
-    res.status(500).json({ error: 'Failed to store permission' });
-}
-};
-
-module.exports = withCompanyId(handler);

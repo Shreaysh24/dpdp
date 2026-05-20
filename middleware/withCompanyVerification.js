@@ -1,5 +1,5 @@
 const Company = require('../models/Company');
-const { connectDB } = require('./mongodb');
+const { connectDB } = require('../lib/mongodb');
 
 /**
  * Middleware to verify API key and attach company to request

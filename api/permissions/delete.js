@@ -23,6 +23,7 @@ const handler = async (req, res) => {
         const result = await Permission.deleteOne({
             companyId,
             userUID,
+            permissionId,
         });
 
         if (result.deletedCount === 0) {

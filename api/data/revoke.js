@@ -46,6 +46,3 @@ const handler = async (req, res) => {
 };
 
 module.exports = withCompanyVerification(handler);
-res.status(500).json({ error: 'Failed to revoke data' });
-
-module.exports = withCompanyId(handler);

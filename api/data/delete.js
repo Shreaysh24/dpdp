@@ -23,6 +23,7 @@ const handler = async (req, res) => {
         const result = await Data.deleteOne({
             companyId,
             userUID,
+            _id: dataId,
         });
 
         if (result.deletedCount === 0) {
@@ -41,5 +42,3 @@ const handler = async (req, res) => {
 };
 
 module.exports = withCompanyVerification(handler);
-
-module.exports = withCompanyId(handler);
