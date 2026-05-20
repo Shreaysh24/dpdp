@@ -7,7 +7,10 @@ const handler = async (req, res) => {
     }
 
     try {
-        const { userUID, id } = req.query;
+        // Extract userUID and id from URL path: /dpdp/data/abc123/data456
+        const urlParts = req.url.split('?')[0].split('/'); // Remove query string and split
+        const id = urlParts[urlParts.length - 1]; // Last part is id
+        const userUID = urlParts[urlParts.length - 2]; // Second to last is userUID
         const companyId = req.companyId;
 
         // Validate required parameters
@@ -23,6 +26,7 @@ const handler = async (req, res) => {
         const dataRecord = await Data.findOne({
             companyId,
             userUID,
+            _id: id,
         });
 
         if (!dataRecord) {

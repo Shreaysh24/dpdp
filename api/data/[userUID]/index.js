@@ -7,7 +7,9 @@ const handler = async (req, res) => {
     }
 
     try {
-        const { userUID } = req.query;
+        // Extract userUID from URL path: /dpdp/data/abc123
+        const urlParts = req.url.split('?')[0].split('/'); // Remove query string and split
+        const userUID = urlParts[urlParts.length - 1]; // Last part is userUID
         const companyId = req.companyId;
 
         // Validate required parameters
