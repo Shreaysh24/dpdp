@@ -1,39 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const Data = require('../../models/Data');
 const User = require('../../models/User');
-const Company = require('../../models/Company');
-const { connectDB } = require('../../lib/mongodb');
-
-// Middleware wrapper for Vercel - with company verification
-const withCompanyId = (handler) => {
-    return async (req, res) => {
-        // Extract companyId from headers
-        const companyId = req.headers['x-company-id'];
-        if (!companyId) {
-            return res.status(400).json({ error: 'Missing companyId - x-company-id header required' });
-        }
-
-        try {
-            // Verify company exists in database
-            const company = await Company.findOne({
-   apiKey: companyId
-})
-            if (!company) {
-                return res.status(403).json({
-                    error: 'Company not found or invalid companyId',
-                    companyId
-                });
-            }
-            req.companyId = companyId;
-            req.company = company;
-        } catch (error) {
-            console.error('Company verification error:', error);
-            return res.status(500).json({ error: 'Failed to verify company' });
-        }
-
-        return handler(req, res);
-    };
-};
+const { withCompanyVerification } = require('../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
     if (req.method !== 'POST') {
@@ -41,18 +9,28 @@ const handler = async (req, res) => {
     }
 
     try {
-        await connectDB();
-
         const { userUID, data } = req.body;
-        const { companyId } = req;
+        const companyId = req.companyId;
 
-        // Validate required fields
-        if (!userUID || !data || !data.type || !data.value) {
-            return res.status(400).json({ error: 'Missing required fields: userUID, data.type, data.value' });
+        // Validate required fields with proper type checking (FIX 5)
+        if (!userUID || typeof userUID !== 'string' || !userUID.trim()) {
+            return res.status(400).json({ error: 'Missing required field: userUID' });
+        }
+
+        if (!data || typeof data !== 'object' || !data.type || !data.value) {
+            return res.status(400).json({ error: 'Missing required fields: data.type, data.value' });
+        }
+
+        if (typeof data.value !== 'string' || !data.value.trim()) {
+            return res.status(400).json({ error: 'data.value must be a non-empty string' });
         }
 
         // Verify user belongs to company (security check)
-        const user = await User.findOne({ companyId, userUID });
+        const user = await User.findOne({ 
+            companyId, 
+            userUID 
+        });
+
         if (!user) {
             return res.status(404).json({ error: 'User not found in company' });
         }
@@ -63,20 +41,18 @@ const handler = async (req, res) => {
         // Create data record with companyId isolation
         const dataRecord = new Data({
             companyId,
-            dataId,
             userUID,
             type: data.type,
-            value: data.value,
-            createdAt: new Date(),
+            value: data.value.trim(),
             revoked: false,
         });
 
         await dataRecord.save();
 
+        // FIX 8: Don't expose internal companyId in response
         res.status(201).json({
             success: true,
             dataId,
-            companyId,
             userUID,
         });
     } catch (error) {
@@ -90,4 +66,4 @@ const handler = async (req, res) => {
     }
 };
 
-module.exports = withCompanyId(handler);
+module.exports = withCompanyVerification(handler);

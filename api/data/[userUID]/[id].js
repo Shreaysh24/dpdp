@@ -1,35 +1,5 @@
 const Data = require('../../../models/Data');
-const Company = require('../../../models/Company');
-const { connectDB } = require('../../../lib/mongodb');
-
-// Middleware wrapper for Vercel - with company verification
-const withCompanyId = (handler) => {
-    return async (req, res) => {
-        // Extract companyId from headers
-        const companyId = req.headers['x-company-id'];
-        if (!companyId) {
-            return res.status(400).json({ error: 'Missing companyId - x-company-id header required' });
-        }
-
-        try {
-            // Verify company exists in database
-            const company = await Company.findById(companyId);
-            if (!company) {
-                return res.status(403).json({
-                    error: 'Company not found or invalid companyId',
-                    companyId
-                });
-            }
-            req.companyId = companyId;
-            req.company = company;
-        } catch (error) {
-            console.error('Company verification error:', error);
-            return res.status(500).json({ error: 'Failed to verify company' });
-        }
-
-        return handler(req, res);
-    };
-};
+const { withCompanyVerification } = require('../../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
     if (req.method !== 'GET') {
@@ -37,36 +7,39 @@ const handler = async (req, res) => {
     }
 
     try {
-        await connectDB();
-
         const { userUID, id } = req.query;
-        const { companyId } = req;
+        const companyId = req.companyId;
 
         // Validate required parameters
-        if (!userUID || !id) {
-            return res.status(400).json({ error: 'Missing required parameters: userUID, id' });
+        if (!userUID || typeof userUID !== 'string' || !userUID.trim()) {
+            return res.status(400).json({ error: 'Missing required parameter: userUID' });
+        }
+
+        if (!id || typeof id !== 'string' || !id.trim()) {
+            return res.status(400).json({ error: 'Missing required parameter: id' });
         }
 
         // Find data with companyId isolation (critical for multi-tenant)
         const dataRecord = await Data.findOne({
             companyId,
-            dataId: id,
             userUID,
         });
 
         if (!dataRecord) {
-            return res.status(404).json({ error: 'Data record not found in company' });
+            return res.status(404).json({ error: 'Data record not found' });
         }
 
+        // FIX 8: Don't expose companyId in response
         res.json({
             success: true,
             data: dataRecord,
-            companyId,
         });
     } catch (error) {
         console.error('Fetch data error:', error);
         res.status(500).json({ error: 'Failed to fetch data' });
     }
 };
+
+module.exports = withCompanyVerification(handler);
 
 module.exports = withCompanyId(handler);

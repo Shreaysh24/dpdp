@@ -1,36 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const User = require('../../models/User');
-const Company = require('../../models/Company');
-const { connectDB } = require('../../lib/mongodb');
-
-// Middleware wrapper for Vercel - with company verification
-const withCompanyId = (handler) => {
-    return async (req, res) => {
-        // Extract companyId from headers
-        const companyId = req.headers['x-company-id'];
-        if (!companyId) {
-            return res.status(400).json({ error: 'Missing companyId - x-company-id header required' });
-        }
-
-        try {
-            // Verify company exists in database
-            const company = await Company.findById(companyId);
-            if (!company) {
-                return res.status(403).json({
-                    error: 'Company not found or invalid companyId',
-                    companyId
-                });
-            }
-            req.companyId = companyId;
-            req.company = company;
-        } catch (error) {
-            console.error('Company verification error:', error);
-            return res.status(500).json({ error: 'Failed to verify company' });
-        }
-
-        return handler(req, res);
-    };
-};
+const { withCompanyVerification } = require('../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
     if (req.method !== 'POST') {
@@ -38,15 +8,19 @@ const handler = async (req, res) => {
     }
 
     try {
-        await connectDB();
-
         // Get email from request body
         const { email } = req.body;
-        const { companyId } = req;
+        const companyId = req.companyId;
 
         // Validate required fields
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
+        if (!email || typeof email !== 'string' || !email.trim()) {
+            return res.status(400).json({ error: 'Email is required and must be a valid string' });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
         }
 
         // Generate unique userUID
@@ -56,16 +30,15 @@ const handler = async (req, res) => {
         const user = new User({
             companyId,
             userUID,
-            email,
-            createdAt: new Date(),
+            email: email.trim(),
         });
 
         await user.save();
 
+        // FIX 8: Don't expose internal companyId in response
         res.status(201).json({
             success: true,
             userUID,
-            companyId,
             email,
         });
     } catch (error) {
@@ -80,4 +53,4 @@ const handler = async (req, res) => {
     }
 };
 
-module.exports = withCompanyId(handler);
+module.exports = withCompanyVerification(handler);

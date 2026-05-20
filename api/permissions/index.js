@@ -1,37 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const Permission = require('../../models/Permission');
 const User = require('../../models/User');
-const Company = require('../../models/Company');
-const { connectDB } = require('../../lib/mongodb');
-
-// Middleware wrapper for Vercel - with company verification
-const withCompanyId = (handler) => {
-    return async (req, res) => {
-        // Extract companyId from headers
-        const companyId = req.headers['x-company-id'];
-        if (!companyId) {
-            return res.status(400).json({ error: 'Missing companyId - x-company-id header required' });
-        }
-
-        try {
-            // Verify company exists in database
-            const company = await Company.findById(companyId);
-            if (!company) {
-                return res.status(403).json({
-                    error: 'Company not found or invalid companyId',
-                    companyId
-                });
-            }
-            req.companyId = companyId;
-            req.company = company;
-        } catch (error) {
-            console.error('Company verification error:', error);
-            return res.status(500).json({ error: 'Failed to verify company' });
-        }
-
-        return handler(req, res);
-    };
-};
+const { withCompanyVerification } = require('../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
     if (req.method !== 'POST') {
@@ -39,18 +9,28 @@ const handler = async (req, res) => {
     }
 
     try {
-        await connectDB();
-
         const { userUID, data } = req.body;
-        const { companyId } = req;
+        const companyId = req.companyId;
 
-        // Validate required fields
-        if (!userUID || !data || !data.subject) {
-            return res.status(400).json({ error: 'Missing required fields: userUID, data.subject' });
+        // Validate required fields with proper type checking (FIX 5)
+        if (!userUID || typeof userUID !== 'string' || !userUID.trim()) {
+            return res.status(400).json({ error: 'Missing required field: userUID' });
+        }
+
+        if (!data || typeof data !== 'object' || !data.subject) {
+            return res.status(400).json({ error: 'Missing required field: data.subject' });
+        }
+
+        if (typeof data.subject !== 'string' || !data.subject.trim()) {
+            return res.status(400).json({ error: 'data.subject must be a non-empty string' });
         }
 
         // Verify user belongs to company (security check)
-        const user = await User.findOne({ companyId, userUID });
+        const user = await User.findOne({
+            companyId,
+            userUID,
+        });
+
         if (!user) {
             return res.status(404).json({ error: 'User not found in company' });
         }
@@ -63,11 +43,31 @@ const handler = async (req, res) => {
             companyId,
             permissionId,
             userUID,
-            subject: data.subject,
-            description: data.description || '',
-            createdAt: new Date(),
+            subject: data.subject.trim(),
+            description: data.description ? data.description.trim() : '',
             revoked: false,
         });
+
+        await permission.save();
+
+        // FIX 8: Don't expose internal companyId in response
+        res.status(201).json({
+            success: true,
+            permissionId,
+            userUID,
+        });
+    } catch (error) {
+        console.error('Store permission error:', error);
+
+        if (error.code === 11000) {
+            return res.status(409).json({ error: 'Permission record already exists for this company' });
+        }
+
+        res.status(500).json({ error: 'Failed to store permission' });
+    }
+};
+
+module.exports = withCompanyVerification(handler);
 
         await permission.save();
 

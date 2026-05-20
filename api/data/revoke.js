@@ -1,35 +1,5 @@
 const Data = require('../../models/Data');
-const Company = require('../../models/Company');
-const { connectDB } = require('../../lib/mongodb');
-
-// Middleware wrapper for Vercel - with company verification
-const withCompanyId = (handler) => {
-    return async (req, res) => {
-        // Extract companyId from headers
-        const companyId = req.headers['x-company-id'];
-        if (!companyId) {
-            return res.status(400).json({ error: 'Missing companyId - x-company-id header required' });
-        }
-
-        try {
-            // Verify company exists in database
-            const company = await Company.findById(companyId);
-            if (!company) {
-                return res.status(403).json({
-                    error: 'Company not found or invalid companyId',
-                    companyId
-                });
-            }
-            req.companyId = companyId;
-            req.company = company;
-        } catch (error) {
-            console.error('Company verification error:', error);
-            return res.status(500).json({ error: 'Failed to verify company' });
-        }
-
-        return handler(req, res);
-    };
-};
+const { withCompanyVerification } = require('../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
     if (req.method !== 'POST') {
@@ -37,25 +7,26 @@ const handler = async (req, res) => {
     }
 
     try {
-        await connectDB();
-
         const { userUID, dataId } = req.body;
-        const { companyId } = req;
+        const companyId = req.companyId;
 
         // Validate required fields
-        if (!userUID || !dataId) {
-            return res.status(400).json({ error: 'Missing required fields: userUID, dataId' });
+        if (!userUID || typeof userUID !== 'string' || !userUID.trim()) {
+            return res.status(400).json({ error: 'Missing required field: userUID' });
         }
 
-        // Find with companyId isolation
+        if (!dataId || typeof dataId !== 'string' || !dataId.trim()) {
+            return res.status(400).json({ error: 'Missing required field: dataId' });
+        }
+
+        // Find with companyId isolation (FIX 7: Using .findOne with companyId)
         const dataRecord = await Data.findOne({
             companyId,
-            dataId,
             userUID,
         });
 
         if (!dataRecord) {
-            return res.status(404).json({ error: 'Data record not found in company' });
+            return res.status(404).json({ error: 'Data record not found' });
         }
 
         // Revoke the data
@@ -63,11 +34,18 @@ const handler = async (req, res) => {
         dataRecord.revokedAt = new Date();
         await dataRecord.save();
 
+        // FIX 8: Don't expose companyId in response
         res.json({
             success: true,
             message: 'Data revoked successfully',
-            companyId,
         });
+    } catch (error) {
+        console.error('Revoke data error:', error);
+        res.status(500).json({ error: 'Failed to revoke data' });
+    }
+};
+
+module.exports = withCompanyVerification(handler);
     } catch (error) {
         console.error('Revoke data error:', error);
         res.status(500).json({ error: 'Failed to revoke data' });
