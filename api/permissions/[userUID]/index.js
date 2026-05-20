@@ -7,7 +7,7 @@ const handler = async (req, res) => {
     }
 
     try {
-        const { userUID } = req.params;
+        const { userUID } = req.query;
         const companyId = req.companyId;
 
         // Validate required parameters
