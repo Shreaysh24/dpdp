@@ -36,6 +36,13 @@
             ]
         },
         {
+            "src": "/dpdp/data/(?<userUID>[^/]*)$",
+            "dest": "api/data/[userUID]/index.js",
+            "methods": [
+                "GET"
+            ]
+        },
+        {
             "src": "/dpdp/data/(?<userUID>[^/]*)/(?<id>[^/]*)",
             "dest": "api/data/[userUID]/[id].js",
             "methods": [
@@ -61,6 +68,13 @@
             "dest": "api/permissions/delete.js",
             "methods": [
                 "DELETE"
+            ]
+        },
+        {
+            "src": "/dpdp/permissions/(?<userUID>[^/]*)$",
+            "dest": "api/permissions/[userUID]/index.js",
+            "methods": [
+                "GET"
             ]
         },
         {
