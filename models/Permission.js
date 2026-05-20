@@ -1,14 +1,19 @@
 const mongoose = require('mongoose');
 
 const permissionSchema = new mongoose.Schema({
+    companyId: {
+        type: String,
+        required: true,
+        index: true,
+    },
     permissionId: {
         type: String,
         required: true,
-        unique: true,
     },
     userUID: {
         type: String,
         required: true,
+        index: true,
     },
     subject: {
         type: String,
@@ -30,5 +35,8 @@ const permissionSchema = new mongoose.Schema({
         type: Date,
     },
 });
+
+// Compound unique index to prevent duplicate permission records per company
+permissionSchema.index({ companyId: 1, permissionId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Permission', permissionSchema);
