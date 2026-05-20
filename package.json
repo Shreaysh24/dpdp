@@ -1,0 +1,18 @@
+{
+  "name": "dpdp-backend",
+  "version": "1.0.0",
+  "description": "DPDP Compliance Platform Backend for Vercel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node api/index.js",
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "mongoose": "^8.0.0",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
