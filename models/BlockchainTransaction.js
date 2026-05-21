@@ -30,7 +30,6 @@ const blockchainTransactionSchema = new mongoose.Schema(
             type: String,
             required: true,
             unique: true,
-            index: true,
         },
         blockNumber: {
             type: Number,
@@ -67,7 +66,7 @@ const blockchainTransactionSchema = new mongoose.Schema(
 
 // Compound index for efficient querying
 blockchainTransactionSchema.index({ companyId: 1, userUID: 1, createdAt: -1 });
-blockchainTransactionSchema.index({ transactionHash: 1 });
+// Note: transactionHash already has index via unique: true
 blockchainTransactionSchema.index({ permissionId: 1 });
 
 module.exports = mongoose.model('BlockchainTransaction', blockchainTransactionSchema);
