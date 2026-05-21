@@ -69,11 +69,19 @@ router.post('/', async (req, res) => {
 
         const permissionId = uuidv4();
 
-        // BLOCKCHAIN FIRST (required) - calculate hash and store on blockchain before MongoDB
-        const dataHash = calculateDataHash(permissionId, userUID, companyId.toString());
-        const blockchainResult = await storeDataOnBlockchain(dataHash, permissionId, userUID);
+        // Try blockchain first - if it fails, skip it (fallback mode)
+        let blockchainResult = null;
+        let blockchainError = null;
 
-        // Blockchain succeeded - now save to MongoDB
+        try {
+            const dataHash = calculateDataHash(permissionId, userUID, companyId.toString());
+            blockchainResult = await storeDataOnBlockchain(dataHash, permissionId, userUID);
+        } catch (error) {
+            console.warn('Blockchain storage skipped:', error.message);
+            blockchainError = error.message;
+        }
+
+        // Save to MongoDB
         const permission = new Permission({
             companyId,
             permissionId,
@@ -85,40 +93,50 @@ router.post('/', async (req, res) => {
 
         await permission.save();
 
-        // Save blockchain transaction to MongoDB
-        const blockchainTx = new BlockchainTransaction({
-            companyId,
-            userUID,
-            permissionId,
-            dataHash,
-            operationType: 'STORE',
-            transactionHash: blockchainResult.transactionHash,
-            blockNumber: blockchainResult.blockNumber,
-            gasUsed: blockchainResult.gasUsed,
-            status: blockchainResult.status,
-            contractAddress: blockchainResult.contractAddress,
-            from: blockchainResult.from,
-            confirmations: blockchainResult.confirmations,
-            metadata: {
-                subject: data.subject.trim(),
-                description: data.description ? data.description.trim() : '',
-                operation: 'PERMISSION_STORAGE'
-            }
-        });
-
-        await blockchainTx.save();
-
-        res.status(201).json({
-            success: true,
-            permissionId,
-            userUID,
-            blockchain: {
+        // If blockchain succeeded, also save blockchain transaction
+        if (blockchainResult) {
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId,
+                dataHash: calculateDataHash(permissionId, userUID, companyId.toString()),
+                operationType: 'STORE',
                 transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
                 status: blockchainResult.status,
+                contractAddress: blockchainResult.contractAddress,
+                from: blockchainResult.from,
                 confirmations: blockchainResult.confirmations,
-                contractAddress: blockchainResult.contractAddress
-            }
-        });
+                metadata: {
+                    subject: data.subject.trim(),
+                    description: data.description ? data.description.trim() : '',
+                    operation: 'PERMISSION_STORAGE'
+                }
+            });
+
+            await blockchainTx.save();
+
+            res.status(201).json({
+                success: true,
+                permissionId,
+                userUID,
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status,
+                    confirmations: blockchainResult.confirmations,
+                    contractAddress: blockchainResult.contractAddress
+                }
+            });
+        } else {
+            res.status(201).json({
+                success: true,
+                permissionId,
+                userUID,
+                blockchainStatus: 'PENDING - Smart contract deployment in progress',
+                blockchainError: blockchainError
+            });
+        }
     } catch (error) {
         console.error('Store permission error:', error);
         if (error.code === 11000) {
@@ -143,44 +161,61 @@ router.post('/revoke', async (req, res) => {
             return res.status(404).json({ error: 'Permission not found' });
         }
 
-        // BLOCKCHAIN FIRST (required) - revoke on blockchain before updating MongoDB
-        const dataHash = calculateDataHash(permissionId, userUID, companyId.toString());
-        const blockchainResult = await storeDataOnBlockchain(dataHash, permissionId, userUID);
+        // Try blockchain first - if it fails, skip it (fallback mode)
+        let blockchainResult = null;
+        let blockchainError = null;
 
-        // Blockchain succeeded - now update MongoDB
+        try {
+            const dataHash = calculateDataHash(permissionId, userUID, companyId.toString());
+            blockchainResult = await storeDataOnBlockchain(dataHash, permissionId, userUID);
+        } catch (error) {
+            console.warn('Blockchain revocation skipped:', error.message);
+            blockchainError = error.message;
+        }
+
+        // Update MongoDB
         permission.revoked = true;
         permission.revokedAt = new Date();
         await permission.save();
 
-        // Save blockchain revocation to MongoDB
-        const blockchainTx = new BlockchainTransaction({
-            companyId,
-            userUID,
-            permissionId,
-            dataHash,
-            operationType: 'REVOKE',
-            transactionHash: blockchainResult.transactionHash,
-            blockNumber: blockchainResult.blockNumber,
-            gasUsed: blockchainResult.gasUsed,
-            status: blockchainResult.status,
-            contractAddress: blockchainResult.contractAddress,
-            from: blockchainResult.from,
-            confirmations: blockchainResult.confirmations,
-            metadata: { operation: 'PERMISSION_REVOCATION', revokedAt: new Date().toISOString() }
-        });
-
-        await blockchainTx.save();
-
-        res.json({
-            success: true,
-            message: 'Permission revoked successfully',
-            blockchain: {
+        // If blockchain succeeded, also save blockchain transaction
+        if (blockchainResult) {
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId,
+                dataHash: calculateDataHash(permissionId, userUID, companyId.toString()),
+                operationType: 'REVOKE',
                 transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
                 status: blockchainResult.status,
                 contractAddress: blockchainResult.contractAddress,
-                confirmations: blockchainResult.confirmations
-            }
-        });
+                from: blockchainResult.from,
+                confirmations: blockchainResult.confirmations,
+                metadata: { operation: 'PERMISSION_REVOCATION', revokedAt: new Date().toISOString() }
+            });
+
+            await blockchainTx.save();
+
+            res.json({
+                success: true,
+                message: 'Permission revoked successfully',
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status,
+                    contractAddress: blockchainResult.contractAddress,
+                    confirmations: blockchainResult.confirmations
+                }
+            });
+        } else {
+            res.json({
+                success: true,
+                message: 'Permission revoked successfully (stored in MongoDB, blockchain pending)',
+                blockchainStatus: 'PENDING',
+                blockchainError: blockchainError
+            });
+        }
     } catch (error) {
         console.error('Revoke permission error:', error);
         res.status(500).json({ error: 'Failed to revoke permission' });

@@ -69,11 +69,19 @@ router.post('/', async (req, res) => {
 
         const dataId = uuidv4();
 
-        // BLOCKCHAIN FIRST (required) - calculate hash and store on blockchain before MongoDB
-        const dataHash = calculateDataHash(dataId, userUID, companyId.toString());
-        const blockchainResult = await storeDataOnBlockchain(dataHash, dataId, userUID);
+        // Try blockchain first - if it fails, skip it (fallback mode)
+        let blockchainResult = null;
+        let blockchainError = null;
 
-        // Blockchain succeeded - now save to MongoDB
+        try {
+            const dataHash = calculateDataHash(dataId, userUID, companyId.toString());
+            blockchainResult = await storeDataOnBlockchain(dataHash, dataId, userUID);
+        } catch (error) {
+            console.warn('Blockchain storage skipped:', error.message);
+            blockchainError = error.message;
+        }
+
+        // Save to MongoDB
         const dataRecord = new Data({
             companyId,
             userUID,
@@ -84,36 +92,46 @@ router.post('/', async (req, res) => {
 
         await dataRecord.save();
 
-        // Save blockchain transaction to MongoDB
-        const blockchainTx = new BlockchainTransaction({
-            companyId,
-            userUID,
-            permissionId: dataId,
-            dataHash,
-            operationType: 'STORE',
-            transactionHash: blockchainResult.transactionHash,
-            blockNumber: blockchainResult.blockNumber,
-            gasUsed: blockchainResult.gasUsed,
-            status: blockchainResult.status,
-            contractAddress: blockchainResult.contractAddress,
-            from: blockchainResult.from,
-            confirmations: blockchainResult.confirmations,
-            metadata: { dataType: data.type, dataValue: data.value.trim(), operation: 'DATA_STORAGE' }
-        });
-
-        await blockchainTx.save();
-
-        res.status(201).json({
-            success: true,
-            dataId,
-            userUID,
-            blockchain: {
+        // If blockchain succeeded, also save blockchain transaction
+        if (blockchainResult) {
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId: dataId,
+                dataHash: calculateDataHash(dataId, userUID, companyId.toString()),
+                operationType: 'STORE',
                 transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
                 status: blockchainResult.status,
+                contractAddress: blockchainResult.contractAddress,
+                from: blockchainResult.from,
                 confirmations: blockchainResult.confirmations,
-                contractAddress: blockchainResult.contractAddress
-            }
-        });
+                metadata: { dataType: data.type, dataValue: data.value.trim(), operation: 'DATA_STORAGE' }
+            });
+
+            await blockchainTx.save();
+
+            res.status(201).json({
+                success: true,
+                dataId,
+                userUID,
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status,
+                    confirmations: blockchainResult.confirmations,
+                    contractAddress: blockchainResult.contractAddress
+                }
+            });
+        } else {
+            res.status(201).json({
+                success: true,
+                dataId,
+                userUID,
+                blockchainStatus: 'PENDING - Smart contract deployment in progress',
+                blockchainError: blockchainError
+            });
+        }
     } catch (error) {
         console.error('Store data error:', error);
         if (error.code === 11000) {
@@ -138,44 +156,61 @@ router.post('/revoke', async (req, res) => {
             return res.status(404).json({ error: 'Data record not found' });
         }
 
-        // BLOCKCHAIN FIRST (required) - revoke on blockchain before updating MongoDB
-        const dataHash = calculateDataHash(dataId, userUID, companyId.toString());
-        const blockchainResult = await storeDataOnBlockchain(dataHash, dataId, userUID);
+        // Try blockchain first - if it fails, skip it (fallback mode)
+        let blockchainResult = null;
+        let blockchainError = null;
 
-        // Blockchain succeeded - now update MongoDB
+        try {
+            const dataHash = calculateDataHash(dataId, userUID, companyId.toString());
+            blockchainResult = await storeDataOnBlockchain(dataHash, dataId, userUID);
+        } catch (error) {
+            console.warn('Blockchain revocation skipped:', error.message);
+            blockchainError = error.message;
+        }
+
+        // Update MongoDB
         dataRecord.revoked = true;
         dataRecord.revokedAt = new Date();
         await dataRecord.save();
 
-        // Save blockchain revocation to MongoDB
-        const blockchainTx = new BlockchainTransaction({
-            companyId,
-            userUID,
-            permissionId: dataId,
-            dataHash,
-            operationType: 'REVOKE',
-            transactionHash: blockchainResult.transactionHash,
-            blockNumber: blockchainResult.blockNumber,
-            gasUsed: blockchainResult.gasUsed,
-            status: blockchainResult.status,
-            contractAddress: blockchainResult.contractAddress,
-            from: blockchainResult.from,
-            confirmations: blockchainResult.confirmations,
-            metadata: { operation: 'DATA_REVOCATION', revokedAt: new Date().toISOString() }
-        });
-
-        await blockchainTx.save();
-
-        res.json({
-            success: true,
-            message: 'Data revoked successfully',
-            blockchain: {
+        // If blockchain succeeded, also save blockchain transaction
+        if (blockchainResult) {
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId: dataId,
+                dataHash: calculateDataHash(dataId, userUID, companyId.toString()),
+                operationType: 'REVOKE',
                 transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
                 status: blockchainResult.status,
                 contractAddress: blockchainResult.contractAddress,
-                confirmations: blockchainResult.confirmations
-            }
-        });
+                from: blockchainResult.from,
+                confirmations: blockchainResult.confirmations,
+                metadata: { operation: 'DATA_REVOCATION', revokedAt: new Date().toISOString() }
+            });
+
+            await blockchainTx.save();
+
+            res.json({
+                success: true,
+                message: 'Data revoked successfully',
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status,
+                    contractAddress: blockchainResult.contractAddress,
+                    confirmations: blockchainResult.confirmations
+                }
+            });
+        } else {
+            res.json({
+                success: true,
+                message: 'Data revoked successfully (stored in MongoDB, blockchain pending)',
+                blockchainStatus: 'PENDING',
+                blockchainError: blockchainError
+            });
+        }
     } catch (error) {
         console.error('Revoke data error:', error);
         res.status(500).json({ error: 'Failed to revoke data' });

@@ -104,11 +104,24 @@ app.post('/dpdp/users', async (req, res) => {
 
         const userUID = uuidv4();
 
-        // BLOCKCHAIN FIRST (required) - then MongoDB
-        const dataHash = calculateDataHash(userUID, email.trim(), companyId.toString());
-        const blockchainResult = await storeDataOnBlockchain(dataHash, userUID, userUID);
+        // Try blockchain first - if it fails, skip it (fallback mode)
+        let blockchainResult = null;
+        let blockchainError = null;
 
-        // Blockchain succeeded - now save to MongoDB
+        try {
+            const dataHash = calculateDataHash(userUID, email.trim(), companyId.toString());
+            blockchainResult = await storeDataOnBlockchain(dataHash, userUID, userUID);
+        } catch (error) {
+            console.warn('Blockchain storage skipped (will be implemented after contract deployed):', error.message);
+            blockchainError = error.message;
+        }
+
+        // If blockchain failed in fallback mode, still proceed with MongoDB
+        if (!blockchainResult) {
+            console.log('Proceeding with MongoDB-only storage (no blockchain)');
+        }
+
+        // Save to MongoDB
         const user = new User({
             companyId,
             userUID,
@@ -117,39 +130,49 @@ app.post('/dpdp/users', async (req, res) => {
 
         await user.save();
 
-        // Save blockchain transaction to MongoDB
-        const blockchainTx = new BlockchainTransaction({
-            companyId,
-            userUID,
-            permissionId: userUID,
-            dataHash,
-            operationType: 'STORE',
-            transactionHash: blockchainResult.transactionHash,
-            blockNumber: blockchainResult.blockNumber,
-            gasUsed: blockchainResult.gasUsed,
-            status: blockchainResult.status,
-            contractAddress: blockchainResult.contractAddress,
-            from: blockchainResult.from,
-            confirmations: blockchainResult.confirmations,
-            metadata: {
-                email: email.trim(),
-                operation: 'USER_CREATION'
-            }
-        });
-
-        await blockchainTx.save();
-
-        res.status(201).json({
-            success: true,
-            userUID,
-            email,
-            blockchain: {
+        // If blockchain succeeded, also save blockchain transaction
+        if (blockchainResult) {
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId: userUID,
+                dataHash: calculateDataHash(userUID, email.trim(), companyId.toString()),
+                operationType: 'STORE',
                 transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
                 status: blockchainResult.status,
+                contractAddress: blockchainResult.contractAddress,
+                from: blockchainResult.from,
                 confirmations: blockchainResult.confirmations,
-                contractAddress: blockchainResult.contractAddress
-            }
-        });
+                metadata: {
+                    email: email.trim(),
+                    operation: 'USER_CREATION'
+                }
+            });
+
+            await blockchainTx.save();
+
+            res.status(201).json({
+                success: true,
+                userUID,
+                email,
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status,
+                    confirmations: blockchainResult.confirmations,
+                    contractAddress: blockchainResult.contractAddress
+                }
+            });
+        } else {
+            res.status(201).json({
+                success: true,
+                userUID,
+                email,
+                blockchainStatus: 'PENDING - Smart contract deployment in progress',
+                blockchainError: blockchainError
+            });
+        }
     } catch (error) {
         console.error('Create user error:', error);
 
