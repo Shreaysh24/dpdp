@@ -83,6 +83,13 @@
             "methods": [
                 "GET"
             ]
+        },
+        {
+            "src": "/dpdp/blockchain-status",
+            "dest": "api/blockchain-status.js",
+            "methods": [
+                "GET"
+            ]
         }
     ]
 }

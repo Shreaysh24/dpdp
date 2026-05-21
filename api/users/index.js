@@ -1,5 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const User = require('../../models/User');
+const BlockchainTransaction = require('../../models/BlockchainTransaction');
+const { storeDataOnBlockchain, calculateDataHash } = require('../../lib/blockchain');
 const { withCompanyVerification } = require('../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
@@ -35,12 +37,59 @@ const handler = async (req, res) => {
 
         await user.save();
 
-        // FIX 8: Don't expose internal companyId in response
-        res.status(201).json({
-            success: true,
-            userUID,
-            email,
-        });
+        // Store user creation metadata on blockchain
+        try {
+            const dataHash = calculateDataHash(userUID, email.trim(), companyId.toString());
+
+            const blockchainResult = await storeDataOnBlockchain(
+                dataHash,
+                userUID,
+                userUID
+            );
+
+            // Save blockchain transaction record
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId: userUID,
+                dataHash,
+                operationType: 'STORE',
+                transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
+                status: blockchainResult.status,
+                contractAddress: blockchainResult.contractAddress,
+                from: blockchainResult.from,
+                confirmations: blockchainResult.confirmations,
+                metadata: {
+                    email: email.trim(),
+                    operation: 'USER_CREATION'
+                }
+            });
+
+            await blockchainTx.save();
+
+            // FIX 8: Don't expose internal companyId in response
+            res.status(201).json({
+                success: true,
+                userUID,
+                email,
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status,
+                    confirmations: blockchainResult.confirmations
+                }
+            });
+        } catch (blockchainError) {
+            console.error('Blockchain storage warning (user stored in DB):', blockchainError.message);
+
+            res.status(201).json({
+                success: true,
+                userUID,
+                email,
+                blockchainError: blockchainError.message
+            });
+        }
     } catch (error) {
         console.error('Create user error:', error);
 

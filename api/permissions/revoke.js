@@ -1,4 +1,6 @@
 const Permission = require('../../models/Permission');
+const BlockchainTransaction = require('../../models/BlockchainTransaction');
+const { storeDataOnBlockchain, calculateDataHash } = require('../../lib/blockchain');
 const { withCompanyVerification } = require('../../middleware/withCompanyVerification');
 
 const handler = async (req, res) => {
@@ -34,11 +36,56 @@ const handler = async (req, res) => {
         permission.revokedAt = new Date();
         await permission.save();
 
-        // FIX 8: Don't expose companyId in response
-        res.json({
-            success: true,
-            message: 'Permission revoked successfully',
-        });
+        // Store revocation metadata on blockchain
+        try {
+            const dataHash = calculateDataHash(permissionId, userUID, companyId.toString());
+
+            const blockchainResult = await storeDataOnBlockchain(
+                dataHash,
+                permissionId,
+                userUID
+            );
+
+            // Save blockchain revocation record
+            const blockchainTx = new BlockchainTransaction({
+                companyId,
+                userUID,
+                permissionId,
+                dataHash,
+                operationType: 'REVOKE',
+                transactionHash: blockchainResult.transactionHash,
+                blockNumber: blockchainResult.blockNumber,
+                gasUsed: blockchainResult.gasUsed,
+                status: blockchainResult.status,
+                contractAddress: blockchainResult.contractAddress,
+                from: blockchainResult.from,
+                confirmations: blockchainResult.confirmations,
+                metadata: {
+                    operation: 'PERMISSION_REVOCATION',
+                    revokedAt: new Date().toISOString()
+                }
+            });
+
+            await blockchainTx.save();
+
+            // FIX 8: Don't expose companyId in response
+            res.json({
+                success: true,
+                message: 'Permission revoked successfully',
+                blockchain: {
+                    transactionHash: blockchainResult.transactionHash,
+                    status: blockchainResult.status
+                }
+            });
+        } catch (blockchainError) {
+            console.error('Blockchain revocation warning:', blockchainError.message);
+
+            res.json({
+                success: true,
+                message: 'Permission revoked successfully',
+                blockchainError: blockchainError.message
+            });
+        }
     } catch (error) {
         console.error('Revoke permission error:', error);
         res.status(500).json({ error: 'Failed to revoke permission' });
