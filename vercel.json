@@ -2,94 +2,14 @@
     "version": 2,
     "builds": [
         {
-            "src": "api/**/*.js",
+            "src": "api/index.js",
             "use": "@vercel/node"
         }
     ],
     "routes": [
         {
-            "src": "/dpdp/users",
-            "dest": "api/users/index.js",
-            "methods": [
-                "POST"
-            ]
-        },
-        {
-            "src": "/dpdp/data",
-            "dest": "api/data/index.js",
-            "methods": [
-                "POST"
-            ]
-        },
-        {
-            "src": "/dpdp/data/revoke",
-            "dest": "api/data/revoke.js",
-            "methods": [
-                "POST"
-            ]
-        },
-        {
-            "src": "/dpdp/data/delete",
-            "dest": "api/data/delete.js",
-            "methods": [
-                "DELETE"
-            ]
-        },
-        {
-            "src": "/dpdp/data/(?<userUID>[^/]*)$",
-            "dest": "api/data/[userUID]/index.js",
-            "methods": [
-                "GET"
-            ]
-        },
-        {
-            "src": "/dpdp/data/(?<userUID>[^/]*)/(?<id>[^/]*)",
-            "dest": "api/data/[userUID]/[id].js",
-            "methods": [
-                "GET"
-            ]
-        },
-        {
-            "src": "/dpdp/permissions",
-            "dest": "api/permissions/index.js",
-            "methods": [
-                "POST"
-            ]
-        },
-        {
-            "src": "/dpdp/permissions/revoke",
-            "dest": "api/permissions/revoke.js",
-            "methods": [
-                "POST"
-            ]
-        },
-        {
-            "src": "/dpdp/permissions/delete",
-            "dest": "api/permissions/delete.js",
-            "methods": [
-                "DELETE"
-            ]
-        },
-        {
-            "src": "/dpdp/permissions/(?<userUID>[^/]*)$",
-            "dest": "api/permissions/[userUID]/index.js",
-            "methods": [
-                "GET"
-            ]
-        },
-        {
-            "src": "/dpdp/permissions/(?<userUID>[^/]*)/(?<id>[^/]*)",
-            "dest": "api/permissions/[userUID]/[id].js",
-            "methods": [
-                "GET"
-            ]
-        },
-        {
-            "src": "/dpdp/blockchain-status",
-            "dest": "api/blockchain-status.js",
-            "methods": [
-                "GET"
-            ]
+            "src": "/(.*)",
+            "dest": "api/index.js"
         }
     ]
 }
